@@ -17,6 +17,49 @@ local LibFroznFunctions = LibStub:GetLibrary("LibFroznFunctions-1.0");
 ----------------------------------------------------------------------------------------------------
 
 -- config
+local function InjectEnumerateInactiveMethod()
+    local originalCreateFramePool = CreateFramePool
+    _G.CreateFramePool = function(...)
+        local pool = originalCreateFramePool(...)
+        
+        if not pool.EnumerateInactive then
+            pool.EnumerateInactive = function(self)
+                local inactiveList = {}
+                local allAuras = {}
+                local activeAuras = {}
+                
+                if self.framePool then
+                    for frame, _ in pairs(self.framePool) do
+                        table.insert(allAuras, frame)
+                    end
+                end
+                
+                for frame, _ in self:EnumerateActive() do
+                    activeAuras[frame] = true
+                end
+                
+                for _, frame in ipairs(allAuras) do
+                    if not activeAuras[frame] then
+                        table.insert(inactiveList, frame)
+                    end
+                end
+                
+                local index = 0
+                return function()
+                    index = index + 1
+                    if index <= #inactiveList then
+                        return inactiveList[index], true
+                    end
+                end
+            end
+        end
+        
+        return pool
+    end
+end
+
+InjectEnumerateInactiveMethod()
+
 local cfg;
 
 -- default config
@@ -2532,7 +2575,12 @@ function tt:GetAnchorPosition(tip)
 		end
 	end
 	
-	local mouseFocus = GetMouseFocus();
+	local mouseFocus
+	if GetCVar('portal') == 'CN' then
+		mouseFocus = GetMouseFoci();
+	else
+		mouseFocus = GetMouseFocus();
+	end
 	
 	if (isUnit == nil) then
 		isUnit = (UnitExists("mouseover")) and (not UnitIsUnit("mouseover", "player")) or (mouseFocus and mouseFocus.GetAttribute and mouseFocus:GetAttribute("unit")); -- GetAttribute("unit") here is bad, as that will find things like buff frames too.
@@ -2720,8 +2768,12 @@ function tt:SetUnitRecordFromTip(tip)
 	-- and it will return as "mouseover", but the "mouseover" unit id is still invalid at this point for those unitframes!
 	-- to overcome this problem, we look if the mouse is over a unitframe, and if that unitframe has a unit attribute set?
 	if (not unitID) then
-		local mouseFocus = GetMouseFocus();
-		
+		local mouseFocus
+		if GetCVar('portal') == 'CN' then
+			mouseFocus = GetMouseFoci();
+		else
+			mouseFocus = GetMouseFocus();
+		end
 		unitID = mouseFocus and mouseFocus.GetAttribute and mouseFocus:GetAttribute("unit");
 	end
 	
